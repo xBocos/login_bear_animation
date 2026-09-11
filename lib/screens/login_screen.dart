@@ -9,17 +9,64 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
+  // Control para mostrar u ocultar la contraseña
+  bool _obscure = true;
+
   @override
   Widget build(BuildContext context) {
-    //Para obtener el tamaño de la pantalla
+    // Para obtener el tamaño de la pantalla
     final Size size = MediaQuery.of(context).size;
+
     return Scaffold(
       body: SafeArea(
         child: Padding(
-          padding: EdgeInsets.symmetric(horizontal: 20),
-          child: Column(children: [
-            SizedBox(height: 300, child: RiveAnimation.asset('login-bear.riv'))
-          ]),
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Column(
+            children: [
+              SizedBox(
+                width: size.width,
+                height: 300,
+                child: const RiveAnimation.asset('login-bear.riv'),
+              ),
+              // Para separar espacio
+              const SizedBox(height: 10),
+              TextField(
+                // Para mostrar el tipo de teclado
+                keyboardType: TextInputType.emailAddress,
+                decoration: InputDecoration(
+                  hintText: 'Email',
+                  prefixIcon: const Icon(Icons.email),
+                  border: OutlineInputBorder(
+                    // Para redondear los bordes
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                obscureText: _obscure,
+                decoration: InputDecoration(
+                  hintText: 'Contraseña',
+                  prefixIcon: const Icon(Icons.lock),
+                  suffixIcon: IconButton(
+                    // If ternario
+                    icon: Icon(
+                      _obscure ? Icons.visibility : Icons.visibility_off,
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        _obscure = !_obscure;
+                      });
+                    },
+                  ),
+                  border: OutlineInputBorder(
+                    // Para redondear los bordes
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ], // Cierre de la lista children
+          ),
         ),
       ),
     );
