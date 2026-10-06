@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:rive/rive.dart';
-import 'dart:async'; // 3.1 Importar el timer
+import 'dart:async';
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key}); // Fixed constructor name
+  const LoginScreen({super.key});
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -12,6 +11,8 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   bool _obscure = true;
+  // NUEVO: Variable de estado local para el checkbox "Remember me"
+  bool _rememberMe = false;
 
   // 1.1 crear el cerebro de la animacion
   StateMachineController? _controller;
@@ -39,7 +40,7 @@ class _LoginScreenState extends State<LoginScreen> {
   String? emailError;
   String? passError;
 
-//4.3 Validadores
+  //4.3 Validadores
   bool isValidEmail(String email) {
     final re = RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$');
     return re.hasMatch(email);
@@ -51,7 +52,7 @@ class _LoginScreenState extends State<LoginScreen> {
     return re.hasMatch(pass);
   }
 
-//4.4 Dar acción al botón
+  //4.4 Dar acción al botón
   void _onLogin() {
     //De lo que escribió el usuario, quitar espacios en blanco
     final email = _emailCtrl.text.trim();
@@ -103,7 +104,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Para obtener el tamaño de la pantalla
     final Size size = MediaQuery.of(context).size;
     return Scaffold(
       body: SingleChildScrollView(
@@ -118,57 +118,42 @@ class _LoginScreenState extends State<LoginScreen> {
                   child: RiveAnimation.asset(
                     'assets/login-bear.riv',
                     stateMachines: const ['Login Machine'],
-                    // 1.2 vincular animacion
                     onInit: (artboard) {
                       _controller = StateMachineController.fromArtboard(
                         artboard,
                         'Login Machine',
                       );
-                      // 1.3 verificar que inicio bien
                       if (_controller == null) return;
-                      // Agrega el controlador al escenario/tablero
                       artboard.addController(_controller!);
-                      // Vinculamos variables
+
                       _isChecking = _controller!.findSMI('isChecking');
                       _isHandsUp = _controller!.findSMI('isHandsUp');
                       _trigSuccess = _controller!.findSMI('trigSuccess');
                       _trigFail = _controller!.findSMI('trigFail');
-                      // 3.5 Vincular numLook
                       _numLook = _controller!.findSMI('numLook');
                     },
                   ),
                 ),
 
-                // para email
                 const SizedBox(height: 10),
                 TextField(
-                  //4.10
                   controller: _emailCtrl,
-                  // 2.3 Asignar foco al campo de texto
                   focusNode: _emailFocus,
                   onChanged: (value) {
-                    if (_isHandsUp != null) {
-                      // _isHandsUp!.change(false);
-                    }
+                    if (_isHandsUp != null) {}
                     if (_isChecking == null) return;
                     _isChecking!.change(true);
 
-                    // 3.6 Implementar numLook
-                    // Ajustes de limites del 0 a 100
-                    // 80 es la medida de calibracion
                     final look =
                         (value.length / 80.0 * 100.0).clamp(0.0, 100.0);
-                    // clamp es el rango (abrazadera)
                     _numLook?.value = look;
 
-                    //3.7 Debounce
                     _typingDebounce?.cancel();
-                    //Crear un nuevo timer
                     _typingDebounce = Timer(const Duration(seconds: 3), () {
                       if (!mounted) return;
                       _isChecking?.change(false);
                     });
-                  }, // Fixed syntax error here
+                  },
                   keyboardType: TextInputType.emailAddress,
                   decoration: InputDecoration(
                     errorText: emailError,
@@ -180,17 +165,12 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
 
-                // contraseña
                 const SizedBox(height: 10),
                 TextField(
-                  //4.10 ENlazar controler
                   controller: _passCril,
-                  // 2.3 Asignar foco al campo de texto
                   focusNode: _passwordFocus,
                   onChanged: (value) {
-                    if (_isChecking != null) {
-                      // _isChecking!.change(false);
-                    }
+                    if (_isChecking != null) {}
                     if (_isHandsUp == null) return;
                     _isHandsUp!.change(true);
                   },
@@ -204,7 +184,6 @@ class _LoginScreenState extends State<LoginScreen> {
                         _obscure ? Icons.visibility : Icons.visibility_off,
                       ),
                       onPressed: () {
-                        // refrescar el icono
                         setState(() {
                           _obscure = !_obscure;
                         });
@@ -215,19 +194,43 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
                 ),
-                SizedBox(height: 10),
-                //4.12 Texto olcide la contraseña
-                SizedBox(
-                  width: size.width,
-                  child: const Text(
-                    'Forgot password?',
-                    //Alinear el pasword
-                    textAlign: TextAlign.right,
-                    style: TextStyle(decoration: TextDecoration.underline),
-                  ),
-                ),
+
                 const SizedBox(height: 10),
-                //4.13 Boton de login
+
+                // NUEVO: Fila que contiene el Checkbox de Remember Me y Forgot Password
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Checkbox(
+                          value: _rememberMe,
+                          activeColor: Colors
+                              .pinkAccent, // Combinando con tu botón de Login
+                          onChanged: (bool? value) {
+                            setState(() {
+                              // Manejo de estado local de la UI
+                              _rememberMe = value ?? false;
+                            });
+                          },
+                        ),
+                        const Text('Remember me'),
+                      ],
+                    ),
+                    TextButton(
+                      onPressed: () {},
+                      child: const Text(
+                        'Forgot password?',
+                        style: TextStyle(
+                          decoration: TextDecoration.underline,
+                          color: Colors.black87,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 10),
                 MaterialButton(
                   minWidth: size.width,
                   height: 50,
@@ -236,29 +239,30 @@ class _LoginScreenState extends State<LoginScreen> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                   onPressed: _onLogin,
-                  child: Text('Login', style: TextStyle(color: Colors.white)),
+                  child: const Text('Login',
+                      style: TextStyle(color: Colors.white)),
                 ),
                 const SizedBox(height: 10),
                 SizedBox(
-                    width: size.width,
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Text("Dont't have an account?"),
-                        TextButton(
-                            onPressed: () {},
-                            child: Text(
-                              'Sign up',
-                              style: TextStyle(
-                                color: Colors.black,
-                                //subrayado
-                                decoration: TextDecoration.underline,
-                                //negritas
-                                fontWeight: FontWeight.bold,
-                              ),
-                            )),
-                      ],
-                    ))
+                  width: size.width,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Text("Don't have an account?"),
+                      TextButton(
+                        onPressed: () {},
+                        child: const Text(
+                          'Sign up',
+                          style: TextStyle(
+                            color: Colors.black,
+                            decoration: TextDecoration.underline,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                )
               ],
             ),
           ),
@@ -269,13 +273,11 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   void dispose() {
-    //4.15 Liberar los controladores
     _emailCtrl.dispose();
     _passCril.dispose();
-    // 2.4 Liberar espacio en memoria
     _emailFocus.dispose();
     _passwordFocus.dispose();
-    _typingDebounce?.cancel(); //3.9 Elimina el timer
+    _typingDebounce?.cancel();
     super.dispose();
   }
 }
