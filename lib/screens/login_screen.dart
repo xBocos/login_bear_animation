@@ -1,9 +1,18 @@
-import 'package:flutter/material.dart';
-import 'package:rive/rive.dart';
 import 'dart:async';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
+import 'package:login_bear_animation/screens/register_screen.dart';
+import 'package:rive/rive.dart';
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+  final VoidCallback? onSuccessAnimationStart;
+  final VoidCallback? onSuccessAnimationEnd;
+
+  const LoginScreen({
+    super.key,
+    this.onSuccessAnimationStart,
+    this.onSuccessAnimationEnd,
+  });
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -11,36 +20,27 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   bool _obscure = true;
-  // NUEVO: Variable de estado local para el checkbox "Remember me"
   bool _rememberMe = false;
+  bool _isLoading = false;
 
-  // 1.1 crear el cerebro de la animacion
   StateMachineController? _controller;
-  // SMI: State Machine Input
   SMIBool? _isChecking;
   SMIBool? _isHandsUp;
   SMITrigger? _trigSuccess;
   SMITrigger? _trigFail;
-
-  // 3.2 Variable del recorrido de la mirada
   SMINumber? _numLook;
 
-  // 3.3 Timer para detener la mirada al dejar de escribir
   Timer? _typingDebounce;
 
-  // 2.1 crear las variables para FocusNode
   final _emailFocus = FocusNode();
   final _passwordFocus = FocusNode();
 
-  //4.1 Controllers que manipulam lo que el usuario escribe
   final _emailCtrl = TextEditingController();
   final _passCril = TextEditingController();
 
-  //4.2 Errores para mostrarlo en UI
   String? emailError;
   String? passError;
 
-  //4.3 Validadores
   bool isValidEmail(String email) {
     final re = RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$');
     return re.hasMatch(email);
@@ -52,38 +52,111 @@ class _LoginScreenState extends State<LoginScreen> {
     return re.hasMatch(pass);
   }
 
-  //4.4 Dar acción al botón
-  void _onLogin() {
-    //De lo que escribió el usuario, quitar espacios en blanco
+  Future<void> _onLogin() async {
+    if (_isLoading) return;
+
     final email = _emailCtrl.text.trim();
     final pass = _passCril.text;
 
-    //4.6 Evaluar los correos
     final eError = isValidEmail(email) ? null : "Invalid email";
     final pError = isValidPassword(pass) ? null : "Invalid password";
 
-    //4.7 Avisar que hubo cmabios
     setState(() {
       emailError = eError;
       passError = pError;
     });
 
-    //4.8 Cerrar el teclado y bajar las manos
-    FocusScope.of(context).unfocus(); //Quita el foco
+    FocusScope.of(context).unfocus();
     _typingDebounce?.cancel();
     _isChecking?.change(false);
     _isHandsUp?.change(false);
     _numLook?.value = 50.0;
 
-    //4.9 Activar trihgers
-    if (eError == null && pError == null) {
-      _trigSuccess?.fire();
-    } else {
+    if (eError != null || pError != null) {
       _trigFail?.fire();
+      return;
+    }
+
+    setState(() => _isLoading = true);
+    widget.onSuccessAnimationStart?.call();
+
+    try {
+      await FirebaseAuth.instance.signInWithEmailAndPassword(
+        email: email,
+        password: pass,
+      );
+
+      if (!mounted) return;
+
+      _trigSuccess?.fire();
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('✅ Inicio de sesión exitoso'),
+          backgroundColor: Colors.green,
+          duration: Duration(seconds: 2),
+        ),
+      );
+
+      await Future.delayed(const Duration(milliseconds: 1600));
+      widget.onSuccessAnimationEnd?.call();
+    } on FirebaseAuthException catch (e) {
+      widget.onSuccessAnimationEnd?.call();
+      if (!mounted) return;
+
+      _trigFail?.fire();
+
+      String mensajeError = 'Error al iniciar sesión';
+      if (e.code == 'user-not-found' ||
+          e.code == 'wrong-password' ||
+          e.code == 'invalid-credential') {
+        mensajeError = 'Correo o contraseña incorrectos';
+      } else if (e.code == 'invalid-email') {
+        mensajeError = 'Formato de correo inválido';
+      } else if (e.code == 'too-many-requests') {
+        mensajeError = 'Demasiados intentos. Intenta más tarde';
+      }
+
+      setState(() {
+        passError = mensajeError;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('❌ $mensajeError'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+    } catch (_) {
+      widget.onSuccessAnimationEnd?.call();
+      if (!mounted) return;
+      _trigFail?.fire();
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
-  // 2.2 Listeners
+  Future<void> _onForgotPassword() async {
+    final sentEmail = await showDialog<String>(
+      context: context,
+      builder: (_) => _ForgotPasswordDialog(
+        initialEmail: _emailCtrl.text.trim(),
+      ),
+    );
+
+    if (sentEmail == null || !mounted) return;
+
+    _trigSuccess?.fire();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('📩 Correo de recuperación enviado a $sentEmail'),
+        backgroundColor: Colors.green,
+      ),
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -91,13 +164,11 @@ class _LoginScreenState extends State<LoginScreen> {
       if (_emailFocus.hasFocus) {
         if (_isHandsUp != null) {
           _isHandsUp?.change(false);
-          // 3.4 Mirada neutra
           _numLook?.value = 50.0;
         }
       }
     });
     _passwordFocus.addListener(() {
-      // manos arriba en el password
       _isHandsUp?.change(_passwordFocus.hasFocus);
     });
   }
@@ -134,13 +205,11 @@ class _LoginScreenState extends State<LoginScreen> {
                     },
                   ),
                 ),
-
                 const SizedBox(height: 10),
                 TextField(
                   controller: _emailCtrl,
                   focusNode: _emailFocus,
                   onChanged: (value) {
-                    if (_isHandsUp != null) {}
                     if (_isChecking == null) return;
                     _isChecking!.change(true);
 
@@ -164,13 +233,11 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
                 ),
-
                 const SizedBox(height: 10),
                 TextField(
                   controller: _passCril,
                   focusNode: _passwordFocus,
                   onChanged: (value) {
-                    if (_isChecking != null) {}
                     if (_isHandsUp == null) return;
                     _isHandsUp!.change(true);
                   },
@@ -194,10 +261,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
                 ),
-
                 const SizedBox(height: 10),
-
-                // NUEVO: Fila que contiene el Checkbox de Remember Me y Forgot Password
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -205,11 +269,9 @@ class _LoginScreenState extends State<LoginScreen> {
                       children: [
                         Checkbox(
                           value: _rememberMe,
-                          activeColor: Colors
-                              .pinkAccent, // Combinando con tu botón de Login
+                          activeColor: Colors.pinkAccent,
                           onChanged: (bool? value) {
                             setState(() {
-                              // Manejo de estado local de la UI
                               _rememberMe = value ?? false;
                             });
                           },
@@ -218,7 +280,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       ],
                     ),
                     TextButton(
-                      onPressed: () {},
+                      onPressed: _onForgotPassword,
                       child: const Text(
                         'Forgot password?',
                         style: TextStyle(
@@ -229,7 +291,6 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ],
                 ),
-
                 const SizedBox(height: 10),
                 MaterialButton(
                   minWidth: size.width,
@@ -238,9 +299,20 @@ class _LoginScreenState extends State<LoginScreen> {
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  onPressed: _onLogin,
-                  child: const Text('Login',
-                      style: TextStyle(color: Colors.white)),
+                  onPressed: _isLoading ? null : _onLogin,
+                  child: _isLoading
+                      ? const SizedBox(
+                          height: 22,
+                          width: 22,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2.5,
+                          ),
+                        )
+                      : const Text(
+                          'Login',
+                          style: TextStyle(color: Colors.white),
+                        ),
                 ),
                 const SizedBox(height: 10),
                 SizedBox(
@@ -250,7 +322,14 @@ class _LoginScreenState extends State<LoginScreen> {
                     children: [
                       const Text("Don't have an account?"),
                       TextButton(
-                        onPressed: () {},
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const RegisterScreen(),
+                            ),
+                          );
+                        },
                         child: const Text(
                           'Sign up',
                           style: TextStyle(
@@ -273,11 +352,149 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   void dispose() {
+    _controller?.dispose();
     _emailCtrl.dispose();
     _passCril.dispose();
     _emailFocus.dispose();
     _passwordFocus.dispose();
     _typingDebounce?.cancel();
     super.dispose();
+  }
+}
+
+class _ForgotPasswordDialog extends StatefulWidget {
+  final String initialEmail;
+
+  const _ForgotPasswordDialog({required this.initialEmail});
+
+  @override
+  State<_ForgotPasswordDialog> createState() => _ForgotPasswordDialogState();
+}
+
+class _ForgotPasswordDialogState extends State<_ForgotPasswordDialog> {
+  late final TextEditingController _resetCtrl;
+  String? _dialogError;
+  bool _isSending = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _resetCtrl = TextEditingController(text: widget.initialEmail);
+  }
+
+  @override
+  void dispose() {
+    _resetCtrl.dispose();
+    super.dispose();
+  }
+
+  bool _isValidEmail(String email) {
+    return RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(email);
+  }
+
+  Future<void> _sendResetEmail() async {
+    if (_isSending) return;
+
+    final targetEmail = _resetCtrl.text.trim();
+    if (!_isValidEmail(targetEmail)) {
+      setState(() {
+        _dialogError = 'Ingresa un correo válido';
+      });
+      return;
+    }
+
+    FocusScope.of(context).unfocus();
+    setState(() {
+      _dialogError = null;
+      _isSending = true;
+    });
+
+    try {
+      await FirebaseAuth.instance.sendPasswordResetEmail(email: targetEmail);
+      if (!mounted) return;
+      Navigator.of(context).pop(targetEmail);
+    } on FirebaseAuthException catch (e) {
+      if (!mounted) return;
+      String errMsg = 'No se pudo enviar el correo';
+      if (e.code == 'user-not-found') {
+        errMsg = 'No existe una cuenta con ese correo';
+      } else if (e.code == 'invalid-email') {
+        errMsg = 'Formato de correo inválido';
+      } else if (e.code == 'too-many-requests') {
+        errMsg = 'Demasiados intentos, espera un momento';
+      }
+      setState(() {
+        _dialogError = errMsg;
+        _isSending = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _dialogError = 'Ocurrió un error inesperado';
+        _isSending = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+      title: const Text('Recuperar contraseña'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Text(
+            'Ingresa tu correo registrado y te enviaremos un enlace para restablecer tu contraseña.',
+            style: TextStyle(fontSize: 14, color: Colors.black87),
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _resetCtrl,
+            keyboardType: TextInputType.emailAddress,
+            enabled: !_isSending,
+            decoration: InputDecoration(
+              labelText: 'Correo electrónico',
+              errorText: _dialogError,
+              prefixIcon: const Icon(Icons.email_outlined),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: _isSending ? null : () => Navigator.of(context).pop(),
+          child: const Text(
+            'Cancelar',
+            style: TextStyle(color: Colors.black54),
+          ),
+        ),
+        ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.pinkAccent,
+            foregroundColor: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
+          onPressed: _isSending ? null : _sendResetEmail,
+          child: _isSending
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                    color: Colors.white,
+                    strokeWidth: 2,
+                  ),
+                )
+              : const Text('Enviar enlace'),
+        ),
+      ],
+    );
   }
 }
