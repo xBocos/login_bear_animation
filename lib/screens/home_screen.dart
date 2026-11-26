@@ -1,5 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:login_bear_animation/screens/products_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -87,8 +88,29 @@ class _HomeScreenState extends State<HomeScreen> {
               const SizedBox(height: 32),
               ElevatedButton.icon(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.pinkAccent,
+                  backgroundColor: Colors.deepPurple,
                   foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 14,
+                  ),
+                ),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const ProductsScreen(),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.inventory_2_outlined),
+                label: const Text('Ver Productos (Spring Boot)'),
+              ),
+              const SizedBox(height: 16),
+              OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.pinkAccent,
+                  side: const BorderSide(color: Colors.pinkAccent),
                   padding: const EdgeInsets.symmetric(
                     horizontal: 24,
                     vertical: 12,
@@ -100,7 +122,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         width: 18,
                         height: 18,
                         child: CircularProgressIndicator(
-                          color: Colors.white,
+                          color: Colors.pinkAccent,
                           strokeWidth: 2,
                         ),
                       )
